@@ -25,4 +25,21 @@ public class RepositoryRetrievalService {
                         .build()
         );
     }
+
+    public List<Document> searchRelevantCode(
+            String question,
+            String repositoryUrl
+    ) {
+        String safeRepositoryUrl = repositoryUrl.replace("'", "\\'");
+
+        return vectorStore.similaritySearch(
+                SearchRequest.builder()
+                        .query(question)
+                        .topK(5)
+                        .filterExpression(
+                                "repositoryUrl == '" + safeRepositoryUrl + "'"
+                        )
+                        .build()
+        );
+    }
 }
