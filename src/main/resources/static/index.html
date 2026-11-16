@@ -4,117 +4,187 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#0b1020">
-    <title>Code Archeologist — AI Repository Explorer</title>
+    <meta name="theme-color" content="#212121">
+    <title>Code Archeologist</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="app-shell">
 
-        <header class="topbar">
+<div class="app">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+
+        <div class="sidebar-top">
             <a class="brand" href="/">
                 <span class="brand-icon">⌘</span>
-                <span>CODE<span class="brand-accent">ARCHEOLOGIST</span></span>
+                <span>Code Archeologist</span>
             </a>
-            <div class="topbar-right">
-                <span class="connection-dot"></span>
-                <span class="connection-label">LOCAL WORKSPACE</span>
-                <span class="version">v1.0</span>
+
+            <button class="new-chat-button" id="newChatButton">
+                <span>＋</span> New chat
+            </button>
+        </div>
+
+        <div class="sidebar-section">
+            <div class="sidebar-label">WORKSPACE</div>
+
+            <div class="repository-card">
+                <div class="repo-icon">⌘</div>
+                <div class="repo-details">
+                    <strong>Repository</strong>
+                    <span id="repoSidebarStatus">Not connected</span>
+                </div>
+                <span class="repo-dot" id="repoDot"></span>
+            </div>
+        </div>
+
+        <div class="sidebar-section">
+            <div class="sidebar-label">REPOSITORY CONNECTION</div>
+
+            <label for="repositoryUrl">GITHUB URL</label>
+
+            <input
+                type="url"
+                id="repositoryUrl"
+                placeholder="https://github.com/owner/repo"
+            >
+
+            <button class="connect-button" id="indexButton">
+                <span>Connect & Index</span>
+                <span>→</span>
+            </button>
+
+            <div id="indexStatus" class="sidebar-status">
+                No repository indexed yet.
+            </div>
+
+            <div id="indexResult" class="index-result hidden"></div>
+        </div>
+
+        <div class="sidebar-bottom">
+            <div class="profile-icon">CA</div>
+            <div>
+                <strong>Code Archeologist</strong>
+                <span>Local AI Workspace</span>
+            </div>
+            <span class="online-dot"></span>
+        </div>
+
+    </aside>
+
+
+    <!-- MAIN CHAT -->
+    <main class="chat-area">
+
+        <header class="chat-header">
+            <div class="header-left">
+                <button class="mobile-menu" id="mobileMenu">☰</button>
+                <span class="header-title">Code Archeologist</span>
+                <span class="model-badge">GEMINI AI</span>
+            </div>
+
+            <div class="header-right">
+                <span class="header-status-dot"></span>
+                <span>LOCAL SESSION</span>
             </div>
         </header>
 
-        <main class="main-content">
-            <section class="hero">
-                <div class="eyebrow">
-                    <span class="eyebrow-line"></span>
-                    AI-POWERED CODE INTELLIGENCE
-                </div>
-                <h1>Understand any<br><span>codebase.</span></h1>
-                <p class="hero-description">
-                    Connect a GitHub repository, index its source code,
-                    and explore its architecture through natural language.
+
+        <!-- CHAT MESSAGES -->
+        <section class="chat-content" id="chatContent">
+
+            <div class="welcome-screen" id="welcomeScreen">
+
+                <div class="welcome-icon">⌘</div>
+
+                <h1>Explore your codebase.</h1>
+
+                <p>
+                    Your AI-powered software engineering companion.
+                    Ask questions, trace execution flows, and understand
+                    unfamiliar code repositories.
                 </p>
-            </section>
 
-            <section class="workspace">
-                <div class="section-heading">
-                    <div>
-                        <span class="section-number">01 / REPOSITORY</span>
-                        <h2>Connect a repository</h2>
-                    </div>
-                    <span class="step-status">WAITING</span>
+                <div class="suggestion-grid">
+
+                    <button class="suggestion-card"
+                            data-question="Explain the overall architecture of this repository.">
+                        <span class="suggestion-icon">⌘</span>
+                        <strong>Understand architecture</strong>
+                        <span>Explore packages and responsibilities</span>
+                    </button>
+
+                    <button class="suggestion-card"
+                            data-question="Where is the main application class and what does it do?">
+                        <span class="suggestion-icon">⌖</span>
+                        <strong>Find entry points</strong>
+                        <span>Discover important classes and methods</span>
+                    </button>
+
+                    <button class="suggestion-card"
+                            data-question="Trace the complete request flow from controller to repository.">
+                        <span class="suggestion-icon">↗</span>
+                        <strong>Trace code execution</strong>
+                        <span>Follow requests across multiple files</span>
+                    </button>
+
+                    <button class="suggestion-card"
+                            data-question="Identify potential bugs or suspicious code in this repository.">
+                        <span class="suggestion-icon">⌕</span>
+                        <strong>Analyze code quality</strong>
+                        <span>Investigate possible issues</span>
+                    </button>
+
                 </div>
+            </div>
 
-                <label for="repositoryUrl">GITHUB REPOSITORY URL</label>
-                <div class="input-row">
-                    <input
-                        type="url"
-                        id="repositoryUrl"
-                        placeholder="https://github.com/owner/repository"
-                        autocomplete="url"
-                    >
-                    <button id="indexButton" type="button">
-                        <span>Index Repository</span>
-                        <span class="button-arrow">→</span>
+            <div id="messages"></div>
+
+            <!-- Existing response elements retained for JavaScript -->
+            <div id="answerStatus" class="answer-status hidden"></div>
+
+            <div id="answerPanel" class="answer-panel hidden">
+                <div id="answerContent" class="answer-content"></div>
+                <div class="sources-section">
+                    <h3>REFERENCED FILES</h3>
+                    <div id="sourcesList"></div>
+                </div>
+            </div>
+
+        </section>
+
+
+        <!-- CHAT INPUT -->
+        <footer class="chat-footer">
+
+            <div class="composer">
+
+                <textarea
+                    id="questionInput"
+                    rows="1"
+                    placeholder="Ask anything about your codebase..."
+                ></textarea>
+
+                <div class="composer-bottom">
+                    <span class="composer-hint">
+                        AI can make mistakes. Verify important code references.
+                    </span>
+
+                    <button id="askButton" class="send-button" title="Send message">
+                        ↑
                     </button>
                 </div>
 
-                <div id="indexStatus" class="status-message">
-                    <span class="status-icon">i</span>
-                    <span>Paste a public GitHub repository URL to get started.</span>
-                </div>
+            </div>
 
-                <div id="indexResult" class="result-panel hidden"></div>
-            </section>
-
-            <section class="workspace question-workspace">
-                <div class="section-heading">
-                    <div>
-                        <span class="section-number">02 / CODE ANALYSIS</span>
-                        <h2>Ask your codebase</h2>
-                    </div>
-                    <span class="ai-label">GEMINI AI</span>
-                </div>
-
-                <label for="questionInput">YOUR QUESTION</label>
-                <textarea
-                    id="questionInput"
-                    rows="3"
-                    placeholder="Where is the main application class? How does authentication work?"
-                ></textarea>
-
-                <button id="askButton" class="ask-button" type="button">
-                    <span>Analyze Codebase</span>
-                    <span class="button-arrow">↗</span>
-                </button>
-
-                <div id="answerStatus" class="status-message">
-                    <span class="status-icon">i</span>
-                    <span>Index a repository before asking questions.</span>
-                </div>
-
-                <div id="answerPanel" class="answer-panel hidden">
-                    <div class="answer-header">
-                        <span class="answer-indicator"></span>
-                        AI ANALYSIS
-                    </div>
-                    <div id="answerContent" class="answer-content"></div>
-
-                    <div class="sources-section">
-                        <h3>SOURCE FILES</h3>
-                        <div id="sourcesList"></div>
-                    </div>
-                </div>
-            </section>
-        </main>
-
-        <footer>
-            <span>CODE ARCHEOLOGIST</span>
-            <span>BUILT FOR DEVELOPERS · POWERED BY GEMINI</span>
         </footer>
 
-    </div>
+    </main>
 
-    <script src="script.js"></script>
+</div>
+
+<script src="script.js"></script>
+
 </body>
 </html>

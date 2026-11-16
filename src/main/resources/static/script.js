@@ -1,193 +1,334 @@
-
 const repositoryInput = document.getElementById("repositoryUrl");
 const questionInput = document.getElementById("questionInput");
 
 const indexButton = document.getElementById("indexButton");
 const askButton = document.getElementById("askButton");
+const newChatButton = document.getElementById("newChatButton");
+const mobileMenu = document.getElementById("mobileMenu");
 
 const indexStatus = document.getElementById("indexStatus");
-const answerStatus = document.getElementById("answerStatus");
-
 const indexResult = document.getElementById("indexResult");
-const answerPanel = document.getElementById("answerPanel");
 
-const answerContent = document.getElementById("answerContent");
-const sourcesList = document.getElementById("sourcesList");
+const messages = document.getElementById("messages");
+const welcomeScreen = document.getElementById("welcomeScreen");
+const chatContent = document.getElementById("chatContent");
 
-let indexedRepository = null;
+const repoSidebarStatus = document.getElementById("repoSidebarStatus");
+const repoDot = document.getElementById("repoDot");
 
+let isAsking = false;
 
-// Display status messages
-function showStatus(element, message, type = "") {
-    element.className = "status-message";
-
-    if (type) {
-        element.classList.add(type);
-    }
-
-    element.querySelector("span:last-child").textContent = message;
-}
-
-
-// Handle API responses
+// API RESPONSE HANDLER
 async function handleResponse(response) {
-    const text = await response.text();
+  const text = await response.text();
 
-    let data;
+  let data;
 
-    try {
-        data = JSON.parse(text);
-    } catch {
-        data = null;
-    }
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = null;
+  }
 
-    if (!response.ok) {
-        const message =
-            data?.message ||
-            data?.error ||
-            text ||
-            `Request failed (${response.status})`;
+  if (!response.ok) {
+    throw new Error(
+      data?.message ||
+        data?.error ||
+        text ||
+        `Request failed: ${response.status}`,
+    );
+  }
 
-        throw new Error(message);
-    }
-
-    return data;
+  return data;
 }
 
+// STATUS DISPLAY
+function showIndexStatus(message, type = "") {
+  indexStatus.textContent = message;
+  indexStatus.className = "sidebar-status";
 
-// INDEX REPOSITORY
+  if (type) {
+    indexStatus.classList.add(type);
+  }
+}
+
+// CHAT SCROLL
+function scrollToBottom() {
+  chatContent.scrollTop = chatContent.scrollHeight;
+}
+
+// CREATE CHAT MESSAGE
+function addMessage(role, content) {
+  const message = document.createElement("div");
+
+  message.className =
+    role === "user"
+      ? "chat-message user-message"
+      : "chat-message assistant-message";
+
+  const roleContainer = document.createElement("div");
+  roleContainer.className = "message-role";
+
+  const avatar = document.createElement("div");
+  avatar.className = "message-avatar";
+  avatar.textContent = role === "user" ? "Y" : "⌘";
+
+  const name = document.createElement("span");
+  name.textContent = role === "user" ? "You" : "Code Archeologist";
+
+  roleContainer.appendChild(avatar);
+  roleContainer.appendChild(name);
+
+  const text = document.createElement("div");
+  text.className = "message-text";
+  text.textContent = content;
+
+  message.appendChild(roleContainer);
+  message.appendChild(text);
+
+  messages.appendChild(message);
+
+  return message;
+}
+
+// SHOW CONNECTED REPOSITORY
+function setRepositoryConnected(repositoryUrl) {
+  const parts = repositoryUrl.replace(/\.git$/, "").split("/");
+  const repositoryName = parts.slice(-2).join("/");
+
+  repoSidebarStatus.textContent = repositoryName;
+  repoDot.classList.add("connected");
+}
+
+// INDEX OR CONNECT REPOSITORY
 indexButton.addEventListener("click", async () => {
+  const repositoryUrl = repositoryInput.value.trim();
 
-    const repositoryUrl = repositoryInput.value.trim();
+  if (
+    !/^https:\/\/(www\.)?github\.com\/[^/]+\/[^/]+\/?$/.test(
+      repositoryUrl.replace(/\.git$/, ""),
+    )
+  ) {
+    showIndexStatus("Enter a valid public GitHub repository URL.", "error");
+    return;
+  }
 
-    if (!repositoryUrl) {
-        showStatus(indexStatus, "Please enter a GitHub repository URL.", "error");
-        return;
-    }
+  indexButton.disabled = true;
+  indexButton.innerHTML = "<span>Checking repository...</span>";
 
-    if (!/^https:\/\/(www\.)?github\.com\/[^/]+\/[^/]+\/?$/.test(repositoryUrl.replace(/\.git$/, ""))) {
-        showStatus(indexStatus, "Please enter a valid public GitHub repository URL.", "error");
-        return;
-    }
+  indexResult.classList.add("hidden");
 
-    indexButton.disabled = true;
-    indexButton.textContent = "Indexing...";
-
-    indexResult.classList.add("hidden");
-    answerPanel.classList.add("hidden");
-    indexedRepository = null;
-
-    showStatus(
-        indexStatus,
-        "Downloading, chunking, embedding and indexing repository. This may take several minutes..."
+  try {
+    // STEP 1: Check whether repository is already indexed
+    const statusResponse = await fetch(
+      `/api/repositories/status?repositoryUrl=${encodeURIComponent(repositoryUrl)}`,
     );
 
-    try {
-        const response = await fetch("/api/repositories/ingest", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                repositoryUrl: repositoryUrl
-            })
-        });
+    const statusData = await handleResponse(statusResponse);
 
-        const data = await handleResponse(response);
+    if (statusData.indexed) {
+      // Repository already exists: do not index again
+      setRepositoryConnected(repositoryUrl);
 
-        indexedRepository = repositoryUrl;
+      localStorage.setItem("codeArcheologistRepositoryUrl", repositoryUrl);
 
-        showStatus(
-            indexStatus,
-            "Repository indexed successfully!",
-            "success"
-        );
+      showIndexStatus(
+        "Repository already indexed. Connected successfully!",
+        "success",
+      );
 
-        indexResult.textContent =
-            `${data.message} | Files: ${data.totalFiles} | Chunks: ${data.totalChunks}`;
+      indexResult.textContent =
+        "Existing Pinecone data reused. No re-indexing required.";
 
-        indexResult.classList.remove("hidden");
+      indexResult.classList.remove("hidden");
 
-        showStatus(
-            answerStatus,
-            "Repository is ready. You can now ask questions.",
-            "success"
-        );
-
-    } catch (error) {
-        showStatus(indexStatus, error.message, "error");
-    } finally {
-        indexButton.disabled = false;
-        indexButton.innerHTML =
-            '<span>Index Repository</span><span class="button-arrow">→</span>';
+      return;
     }
+
+    // STEP 2: Repository is not indexed, so index it
+    indexButton.innerHTML = "<span>Indexing...</span>";
+
+    showIndexStatus("Repository not indexed. Starting indexing process...");
+
+    const response = await fetch("/api/repositories/ingest", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        repositoryUrl: repositoryUrl,
+      }),
+    });
+
+    const data = await handleResponse(response);
+
+    setRepositoryConnected(repositoryUrl);
+
+    localStorage.setItem("codeArcheologistRepositoryUrl", repositoryUrl);
+
+    showIndexStatus("Repository indexed successfully!", "success");
+
+    indexResult.textContent = `${data.totalFiles} files · ${data.totalChunks} chunks`;
+
+    indexResult.classList.remove("hidden");
+  } catch (error) {
+    showIndexStatus(error.message, "error");
+  } finally {
+    indexButton.disabled = false;
+
+    indexButton.innerHTML = "<span>Connect & Index</span><span>→</span>";
+  }
 });
 
+// ASK GEMINI A QUESTION
+async function askQuestion(question) {
+  if (isAsking) {
+    return;
+  }
 
-// ASK QUESTION
-askButton.addEventListener("click", async () => {
+  const repositoryUrl = repositoryInput.value.trim();
 
-    const question = questionInput.value.trim();
+  if (
+    !/^https:\/\/(www\.)?github\.com\/[^/]+\/[^/]+\/?$/.test(
+      repositoryUrl.replace(/\.git$/, ""),
+    )
+  ) {
+    addMessage(
+      "assistant",
+      "Please enter a valid GitHub repository URL in the sidebar first.",
+    );
+    return;
+  }
 
-    if (!indexedRepository) {
-        showStatus(
-            answerStatus,
-            "Please index a repository before asking questions.",
-            "error"
-        );
-        return;
+  if (!question.trim()) {
+    return;
+  }
+
+  isAsking = true;
+
+  welcomeScreen.classList.add("hidden");
+
+  addMessage("user", question);
+
+  questionInput.value = "";
+
+  askButton.disabled = true;
+  askButton.textContent = "…";
+
+  const loadingMessage = addMessage(
+    "assistant",
+    "Searching the repository and analyzing relevant code...",
+  );
+
+  setRepositoryConnected(repositoryUrl);
+
+  scrollToBottom();
+
+  try {
+    const response = await fetch("/api/repositories/ask", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        repositoryUrl: repositoryUrl,
+        question: question,
+      }),
+    });
+
+    const data = await handleResponse(response);
+
+    loadingMessage.remove();
+
+    addMessage("assistant", data.answer || "No answer was returned.");
+
+    // Display source files
+    if (data.sources && data.sources.length > 0) {
+      const sourcesContainer = document.createElement("div");
+      sourcesContainer.className = "answer-panel";
+
+      const heading = document.createElement("div");
+      heading.className = "sources-section";
+
+      const title = document.createElement("h3");
+      title.textContent = "REFERENCED FILES";
+
+      heading.appendChild(title);
+
+      data.sources.forEach((source) => {
+        const item = document.createElement("div");
+        item.className = "source-item";
+        item.textContent = source;
+        heading.appendChild(item);
+      });
+
+      sourcesContainer.appendChild(heading);
+      messages.appendChild(sourcesContainer);
     }
+  } catch (error) {
+    loadingMessage.remove();
 
-    if (!question) {
-        showStatus(answerStatus, "Please enter a question.", "error");
-        return;
-    }
+    addMessage("assistant", `Sorry, something went wrong: ${error.message}`);
+  } finally {
+    isAsking = false;
+    askButton.disabled = false;
+    askButton.textContent = "↑";
 
-    askButton.disabled = true;
-    askButton.textContent = "Analyzing...";
+    questionInput.focus();
+    scrollToBottom();
+  }
+}
 
-    answerPanel.classList.add("hidden");
+// SEND BUTTON
+askButton.addEventListener("click", () => {
+  askQuestion(questionInput.value.trim());
+});
 
-    showStatus(answerStatus, "Searching repository and generating an AI answer...");
+// ENTER TO SEND, SHIFT + ENTER FOR NEW LINE
+questionInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    askQuestion(questionInput.value.trim());
+  }
+});
 
-    try {
-        const response = await fetch("/api/repositories/ask", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                repositoryUrl: indexedRepository,
-                question: question
-            })
-        });
+// SUGGESTED QUESTIONS
+document.querySelectorAll(".suggestion-card").forEach((card) => {
+  card.addEventListener("click", () => {
+    const question = card.dataset.question;
+    askQuestion(question);
+  });
+});
 
-        const data = await handleResponse(response);
+// NEW CHAT
+newChatButton.addEventListener("click", () => {
+  messages.replaceChildren();
 
-        answerContent.textContent = data.answer || "No answer returned.";
+  welcomeScreen.classList.remove("hidden");
 
-        sourcesList.replaceChildren();
+  questionInput.value = "";
 
-        if (data.sources && data.sources.length > 0) {
-            data.sources.forEach(source => {
-                const item = document.createElement("div");
-                item.className = "source-item";
-                item.textContent = source;
-                sourcesList.appendChild(item);
-            });
-        } else {
-            sourcesList.textContent = "No source files returned.";
-        }
+  questionInput.focus();
 
-        answerPanel.classList.remove("hidden");
+  scrollToBottom();
+});
 
-        showStatus(answerStatus, "Analysis completed successfully!", "success");
+// MOBILE SIDEBAR
+mobileMenu.addEventListener("click", () => {
+  document.getElementById("sidebar").classList.toggle("open");
+});
 
-    } catch (error) {
-        showStatus(answerStatus, error.message, "error");
-    } finally {
-        askButton.disabled = false;
-        askButton.innerHTML =
-            '<span>Analyze Codebase</span><span class="button-arrow">↗</span>';
-    }
+// RESTORE LAST CONNECTED REPOSITORY
+window.addEventListener("DOMContentLoaded", () => {
+  const savedRepository = localStorage.getItem("codeArcheologistRepositoryUrl");
+
+  if (savedRepository) {
+    repositoryInput.value = savedRepository;
+
+    setRepositoryConnected(savedRepository);
+
+    showIndexStatus(
+      "Previously connected repository. Checking availability...",
+    );
+  }
 });

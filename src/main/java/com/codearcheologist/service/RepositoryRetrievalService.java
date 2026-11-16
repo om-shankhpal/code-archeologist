@@ -1,3 +1,4 @@
+
 package com.codearcheologist.service;
 
 import org.springframework.ai.document.Document;
@@ -17,19 +18,16 @@ public class RepositoryRetrievalService {
     }
 
     public List<Document> searchRelevantCode(String question) {
-
         return vectorStore.similaritySearch(
                 SearchRequest.builder()
                         .query(question)
                         .topK(5)
-                        .build()
-        );
+                        .build());
     }
 
     public List<Document> searchRelevantCode(
             String question,
-            String repositoryUrl
-    ) {
+            String repositoryUrl) {
         String safeRepositoryUrl = repositoryUrl.replace("'", "\\'");
 
         return vectorStore.similaritySearch(
@@ -37,9 +35,13 @@ public class RepositoryRetrievalService {
                         .query(question)
                         .topK(5)
                         .filterExpression(
-                                "repositoryUrl == '" + safeRepositoryUrl + "'"
-                        )
-                        .build()
-        );
+                                "repositoryUrl == '" + safeRepositoryUrl + "'")
+                        .build());
+    }
+
+    public boolean isRepositoryIndexed(String repositoryUrl) {
+        return !searchRelevantCode(
+                "repository indexing verification",
+                repositoryUrl).isEmpty();
     }
 }
