@@ -57,6 +57,140 @@ function scrollToBottom() {
   chatContent.scrollTop = chatContent.scrollHeight;
 }
 
+function escapeHTML(value) {
+  return value.replace(
+    /[&<>"']/g,
+    (character) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[character],
+  );
+}
+
+function formatInlineMarkdown(value) {
+  let html = escapeHTML(value);
+
+  html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
+  html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+  html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
+
+  return html;
+}
+
+function renderMarkdown(container, markdown) {
+  container.replaceChildren();
+
+  const lines = markdown.split("\n");
+
+  let paragraph = [];
+  let list = null;
+  let codeLines = [];
+  let inCodeBlock = false;
+
+  function flushParagraph() {
+    if (paragraph.length === 0) return;
+
+    const p = document.createElement("p");
+    p.innerHTML = paragraph.map(formatInlineMarkdown).join("<br>");
+
+    container.appendChild(p);
+    paragraph = [];
+  }
+
+  function flushList() {
+    if (!list) return;
+
+    container.appendChild(list);
+    list = null;
+  }
+
+  function flushCode() {
+    const pre = document.createElement("pre");
+    const code = document.createElement("code");
+
+    code.textContent = codeLines.join("\n");
+
+    pre.appendChild(code);
+    container.appendChild(pre);
+
+    codeLines = [];
+  }
+
+  for (const line of lines) {
+    if (line.trim().startsWith("```")) {
+      flushParagraph();
+      flushList();
+
+      if (inCodeBlock) {
+        flushCode();
+      }
+
+      inCodeBlock = !inCodeBlock;
+      continue;
+    }
+
+    if (inCodeBlock) {
+      codeLines.push(line);
+      continue;
+    }
+
+    if (!line.trim()) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+
+    const heading = line.match(/^(#{1,3})\s+(.+)$/);
+
+    if (heading) {
+      flushParagraph();
+      flushList();
+
+      const element = document.createElement(`h${heading[1].length}`);
+
+      element.innerHTML = formatInlineMarkdown(heading[2]);
+      container.appendChild(element);
+      continue;
+    }
+
+    const bullet = line.match(/^\s*[-*]\s+(.+)$/);
+    const numbered = line.match(/^\s*\d+[.)]\s+(.+)$/);
+
+    if (bullet || numbered) {
+      flushParagraph();
+
+      const isOrdered = Boolean(numbered);
+      const type = isOrdered ? "ol" : "ul";
+
+      if (!list || list.tagName.toLowerCase() !== type) {
+        flushList();
+        list = document.createElement(type);
+      }
+
+      const item = document.createElement("li");
+
+      item.innerHTML = formatInlineMarkdown((bullet || numbered)[1]);
+
+      list.appendChild(item);
+      continue;
+    }
+
+    flushList();
+    paragraph.push(line);
+  }
+
+  if (inCodeBlock) {
+    flushCode();
+  }
+
+  flushParagraph();
+  flushList();
+}
+
 // CREATE CHAT MESSAGE
 function addMessage(role, content) {
   const message = document.createElement("div");
@@ -81,7 +215,8 @@ function addMessage(role, content) {
 
   const text = document.createElement("div");
   text.className = "message-text";
-  text.textContent = content;
+
+  renderMarkdown(text, content);
 
   message.appendChild(roleContainer);
   message.appendChild(text);
