@@ -1,190 +1,198 @@
-
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#212121">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1c2227" />
     <title>Code Archeologist</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-
-<div class="app">
-
-    <!-- SIDEBAR -->
-    <aside class="sidebar" id="sidebar">
-
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <!-- SIDEBAR -->
+      <aside class="sidebar" id="sidebar">
         <div class="sidebar-top">
-            <a class="brand" href="/">
-                <span class="brand-icon">⌘</span>
-                <span>Code Archeologist</span>
-            </a>
+          <button
+            class="sidebar-close"
+            id="closeSidebar"
+            aria-label="Close sidebar"
+          >
+            ×
+          </button>
+          <a class="brand" href="/">
+            <span class="brand-icon">⌘</span>
+            <span class="brand-text">
+              Code Archeologist
+              <small>Dig through any codebase</small>
+            </span>
+          </a>
 
-            <button class="new-chat-button" id="newChatButton">
-                <span>＋</span> New chat
-            </button>
+          <button class="new-chat-button" id="newChatButton">
+            <span>＋</span> New chat
+          </button>
         </div>
 
-        <div class="sidebar-section">
-            <div class="sidebar-label">WORKSPACE</div>
+        <!-- CHAT HISTORY -->
+        <div class="sidebar-section chat-history-section">
+          <div class="sidebar-label">RECENT CHATS</div>
 
-            <div class="repository-card">
-                <div class="repo-icon">⌘</div>
-                <div class="repo-details">
-                    <strong>Repository</strong>
-                    <span id="repoSidebarStatus">Not connected</span>
-                </div>
-                <span class="repo-dot" id="repoDot"></span>
+          <div id="chatHistory" class="chat-history">
+            <div class="chat-history-empty">
+              Your conversations will appear here.
             </div>
+          </div>
         </div>
 
-        <div class="sidebar-section">
-            <div class="sidebar-label">REPOSITORY CONNECTION</div>
+        <!-- REPOSITORY PANEL -->
+        <div class="repository-panel">
+          <div class="repository-panel-heading">
+            <strong>Repository</strong>
+            <span class="repo-dot" id="repoDot"></span>
+          </div>
 
-            <label for="repositoryUrl">GITHUB URL</label>
+          <div class="repository-connected-name" id="repoSidebarStatus">
+            Not connected
+          </div>
 
-            <input
-                type="url"
-                id="repositoryUrl"
-                placeholder="https://github.com/owner/repo"
-            >
+          <label for="repositoryUrl">GITHUB URL</label>
 
-            <button class="connect-button" id="indexButton">
-                <span>Connect & Index</span>
-                <span>→</span>
-            </button>
+          <input
+            type="url"
+            id="repositoryUrl"
+            placeholder="https://github.com/owner/repo"
+          />
 
-            <div id="indexStatus" class="sidebar-status">
-                No repository indexed yet.
-            </div>
+          <button class="connect-button" id="indexButton">
+            <span>Connect &amp; Index</span>
+            <span>→</span>
+          </button>
 
-            <div id="indexResult" class="index-result hidden"></div>
+          <div id="indexStatus" class="sidebar-status">
+            No repository indexed yet.
+          </div>
+
+          <div id="indexResult" class="index-result hidden"></div>
         </div>
 
+        <!-- PROFILE -->
         <div class="sidebar-bottom">
-            <div class="profile-icon">CA</div>
-            <div>
-                <strong>Code Archeologist</strong>
-                <span>Local AI Workspace</span>
-            </div>
-            <span class="online-dot"></span>
+          <div class="profile-icon">CA</div>
+
+          <div>
+            <strong>Code Archeologist</strong>
+            <span>Local AI Workspace</span>
+          </div>
+
+          <span class="online-dot"></span>
         </div>
+      </aside>
 
-    </aside>
-
-
-    <!-- MAIN CHAT -->
-    <main class="chat-area">
-
+      <!-- MAIN CHAT -->
+      <main class="chat-area">
         <header class="chat-header">
-            <div class="header-left">
-                <button class="mobile-menu" id="mobileMenu">☰</button>
-                <span class="header-title">Code Archeologist</span>
-                <span class="model-badge">GEMINI AI</span>
-            </div>
+          <div class="header-left">
+            <button class="mobile-menu" id="mobileMenu" aria-label="Open menu">
+              ☰
+            </button>
+            <span class="header-title">Code Archeologist</span>
+            <span class="model-badge">GEMINI AI</span>
+          </div>
 
-            <div class="header-right">
-                <span class="header-status-dot"></span>
-                <span>LOCAL SESSION</span>
-            </div>
+          <div class="header-right">
+            <span class="header-status-dot"></span>
+            <span>LOCAL SESSION</span>
+          </div>
         </header>
-
 
         <!-- CHAT MESSAGES -->
         <section class="chat-content" id="chatContent">
+          <div class="welcome-screen" id="welcomeScreen">
+            <div class="welcome-icon">⌘</div>
 
-            <div class="welcome-screen" id="welcomeScreen">
+            <h1>Explore your codebase.</h1>
 
-                <div class="welcome-icon">⌘</div>
+            <p>
+              Your calm companion for understanding unfamiliar code. Ask
+              questions, trace execution flows, and make sense of any
+              repository.
+            </p>
 
-                <h1>Explore your codebase.</h1>
+            <div class="suggestion-grid">
+              <button
+                class="suggestion-card"
+                data-question="Explain the overall architecture of this repository."
+              >
+                <span class="suggestion-icon">⌘</span>
+                <strong>Understand architecture</strong>
+                <span>Explore packages and responsibilities</span>
+              </button>
 
-                <p>
-                    Your AI-powered software engineering companion.
-                    Ask questions, trace execution flows, and understand
-                    unfamiliar code repositories.
-                </p>
+              <button
+                class="suggestion-card"
+                data-question="Where is the main application class and what does it do?"
+              >
+                <span class="suggestion-icon">⌖</span>
+                <strong>Find entry points</strong>
+                <span>Discover important classes and methods</span>
+              </button>
 
-                <div class="suggestion-grid">
+              <button
+                class="suggestion-card"
+                data-question="Trace the complete request flow from controller to repository."
+              >
+                <span class="suggestion-icon">↗</span>
+                <strong>Trace code execution</strong>
+                <span>Follow requests across multiple files</span>
+              </button>
 
-                    <button class="suggestion-card"
-                            data-question="Explain the overall architecture of this repository.">
-                        <span class="suggestion-icon">⌘</span>
-                        <strong>Understand architecture</strong>
-                        <span>Explore packages and responsibilities</span>
-                    </button>
-
-                    <button class="suggestion-card"
-                            data-question="Where is the main application class and what does it do?">
-                        <span class="suggestion-icon">⌖</span>
-                        <strong>Find entry points</strong>
-                        <span>Discover important classes and methods</span>
-                    </button>
-
-                    <button class="suggestion-card"
-                            data-question="Trace the complete request flow from controller to repository.">
-                        <span class="suggestion-icon">↗</span>
-                        <strong>Trace code execution</strong>
-                        <span>Follow requests across multiple files</span>
-                    </button>
-
-                    <button class="suggestion-card"
-                            data-question="Identify potential bugs or suspicious code in this repository.">
-                        <span class="suggestion-icon">⌕</span>
-                        <strong>Analyze code quality</strong>
-                        <span>Investigate possible issues</span>
-                    </button>
-
-                </div>
+              <button
+                class="suggestion-card"
+                data-question="Identify potential bugs or suspicious code in this repository."
+              >
+                <span class="suggestion-icon">⌕</span>
+                <strong>Analyze code quality</strong>
+                <span>Investigate possible issues</span>
+              </button>
             </div>
+          </div>
 
-            <div id="messages"></div>
+          <div id="messages"></div>
 
-            <!-- Existing response elements retained for JavaScript -->
-            <div id="answerStatus" class="answer-status hidden"></div>
+          <!-- Response elements retained for JavaScript -->
+          <div id="answerStatus" class="answer-status hidden"></div>
 
-            <div id="answerPanel" class="answer-panel hidden">
-                <div id="answerContent" class="answer-content"></div>
-                <div class="sources-section">
-                    <h3>REFERENCED FILES</h3>
-                    <div id="sourcesList"></div>
-                </div>
+          <div id="answerPanel" class="answer-panel hidden">
+            <div id="answerContent" class="answer-content"></div>
+            <div class="sources-section">
+              <h3>REFERENCED FILES</h3>
+              <div id="sourcesList"></div>
             </div>
-
+          </div>
         </section>
-
 
         <!-- CHAT INPUT -->
         <footer class="chat-footer">
+          <div class="composer">
+            <textarea
+              id="questionInput"
+              rows="1"
+              placeholder="Ask anything about your codebase..."
+            ></textarea>
 
-            <div class="composer">
+            <div class="composer-bottom">
+              <span class="composer-hint">
+                AI can make mistakes. Verify important code references.
+              </span>
 
-                <textarea
-                    id="questionInput"
-                    rows="1"
-                    placeholder="Ask anything about your codebase..."
-                ></textarea>
-
-                <div class="composer-bottom">
-                    <span class="composer-hint">
-                        AI can make mistakes. Verify important code references.
-                    </span>
-
-                    <button id="askButton" class="send-button" title="Send message">
-                        ↑
-                    </button>
-                </div>
-
+              <button id="askButton" class="send-button" title="Send message">
+                ↑
+              </button>
             </div>
-
+          </div>
         </footer>
+      </main>
+    </div>
 
-    </main>
-
-</div>
-
-<script src="script.js"></script>
-
-</body>
+    <script src="script.js"></script>
+  </body>
 </html>

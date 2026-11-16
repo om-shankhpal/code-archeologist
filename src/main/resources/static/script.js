@@ -18,6 +18,150 @@ const repoDot = document.getElementById("repoDot");
 
 let isAsking = false;
 
+const chatHistory = document.getElementById("chatHistory");
+
+let conversations = JSON.parse(
+  localStorage.getItem("codeArcheologistChats") || "[]",
+);
+
+let activeChatId = null;
+
+const CHAT_STORAGE_KEY = "codeArcheologistChats";
+
+function saveConversations() {
+  localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(conversations));
+}
+
+function getActiveConversation() {
+  return conversations.find((chat) => chat.id === activeChatId);
+}
+
+function createConversation() {
+  const conversation = {
+    id: crypto.randomUUID(),
+    title: "New chat",
+    repositoryUrl: repositoryInput.value.trim(),
+    messages: [],
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  conversations.unshift(conversation);
+  activeChatId = conversation.id;
+
+  saveConversations();
+  renderChatHistory();
+
+  messages.replaceChildren();
+  welcomeScreen.classList.remove("hidden");
+
+  return conversation;
+}
+
+function saveMessage(role, content) {
+  const conversation = getActiveConversation();
+
+  if (!conversation) return;
+
+  conversation.messages.push({
+    role,
+    content,
+    timestamp: Date.now(),
+  });
+
+  if (role === "user" && conversation.title === "New chat") {
+    conversation.title =
+      content.length > 35 ? content.substring(0, 35) + "..." : content;
+  }
+
+  conversation.updatedAt = Date.now();
+
+  saveConversations();
+  renderChatHistory();
+}
+
+function renderChatHistory() {
+  chatHistory.replaceChildren();
+
+  if (conversations.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "chat-history-empty";
+    empty.textContent = "Your conversations will appear here.";
+    chatHistory.appendChild(empty);
+    return;
+  }
+
+  conversations.forEach((conversation) => {
+    const item = document.createElement("div");
+
+    item.className =
+      "chat-history-item" + (conversation.id === activeChatId ? " active" : "");
+
+    const title = document.createElement("span");
+    title.className = "chat-history-title";
+    title.textContent = conversation.title;
+
+    const deleteButton = document.createElement("button");
+    deleteButton.className = "chat-history-delete";
+    deleteButton.textContent = "×";
+    deleteButton.title = "Delete conversation";
+
+    deleteButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      deleteConversation(conversation.id);
+    });
+
+    item.addEventListener("click", () => {
+      openConversation(conversation.id);
+    });
+
+    item.appendChild(title);
+    item.appendChild(deleteButton);
+
+    chatHistory.appendChild(item);
+  });
+}
+
+function openConversation(id) {
+  const conversation = conversations.find((chat) => chat.id === id);
+
+  if (!conversation) return;
+
+  activeChatId = id;
+
+  messages.replaceChildren();
+
+  welcomeScreen.classList.toggle("hidden", conversation.messages.length > 0);
+
+  repositoryInput.value = conversation.repositoryUrl || "";
+
+  if (conversation.repositoryUrl) {
+    setRepositoryConnected(conversation.repositoryUrl);
+  }
+
+  conversation.messages.forEach((message) => {
+    addMessage(message.role, message.content);
+  });
+
+  renderChatHistory();
+  scrollToBottom();
+}
+
+function deleteConversation(id) {
+  conversations = conversations.filter(
+    (conversation) => conversation.id !== id,
+  );
+
+  if (activeChatId === id) {
+    activeChatId = null;
+    messages.replaceChildren();
+    welcomeScreen.classList.remove("hidden");
+  }
+
+  saveConversations();
+  renderChatHistory();
+}
+
 // API RESPONSE HANDLER
 async function handleResponse(response) {
   const text = await response.text();
@@ -315,11 +459,8 @@ indexButton.addEventListener("click", async () => {
   }
 });
 
-// ASK GEMINI A QUESTION
 async function askQuestion(question) {
-  if (isAsking) {
-    return;
-  }
+  if (isAsking || !question.trim()) return;
 
   const repositoryUrl = repositoryInput.value.trim();
 
@@ -335,15 +476,19 @@ async function askQuestion(question) {
     return;
   }
 
-  if (!question.trim()) {
-    return;
+  isAsking = true;
+
+  if (!activeChatId || !getActiveConversation()) {
+    createConversation();
   }
 
-  isAsking = true;
+  const conversation = getActiveConversation();
+  conversation.repositoryUrl = repositoryUrl;
 
   welcomeScreen.classList.add("hidden");
 
   addMessage("user", question);
+  saveMessage("user", question);
 
   questionInput.value = "";
 
@@ -356,7 +501,6 @@ async function askQuestion(question) {
   );
 
   setRepositoryConnected(repositoryUrl);
-
   scrollToBottom();
 
   try {
@@ -366,8 +510,8 @@ async function askQuestion(question) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        repositoryUrl: repositoryUrl,
-        question: question,
+        repositoryUrl,
+        question,
       }),
     });
 
@@ -375,9 +519,11 @@ async function askQuestion(question) {
 
     loadingMessage.remove();
 
-    addMessage("assistant", data.answer || "No answer was returned.");
+    const answer = data.answer || "No answer was returned.";
 
-    // Display source files
+    addMessage("assistant", answer);
+    saveMessage("assistant", answer);
+
     if (data.sources && data.sources.length > 0) {
       const sourcesContainer = document.createElement("div");
       sourcesContainer.className = "answer-panel";
@@ -403,7 +549,10 @@ async function askQuestion(question) {
   } catch (error) {
     loadingMessage.remove();
 
-    addMessage("assistant", `Sorry, something went wrong: ${error.message}`);
+    const errorMessage = `Sorry, something went wrong: ${error.message}`;
+
+    addMessage("assistant", errorMessage);
+    saveMessage("assistant", errorMessage);
   } finally {
     isAsking = false;
     askButton.disabled = false;
@@ -437,21 +586,30 @@ document.querySelectorAll(".suggestion-card").forEach((card) => {
 
 // NEW CHAT
 newChatButton.addEventListener("click", () => {
-  messages.replaceChildren();
-
-  welcomeScreen.classList.remove("hidden");
-
-  questionInput.value = "";
-
+  createConversation();
   questionInput.focus();
-
-  scrollToBottom();
 });
 
 // MOBILE SIDEBAR
+
+const sidebar = document.getElementById("sidebar");
+const closeSidebar = document.getElementById("closeSidebar");
+
 mobileMenu.addEventListener("click", () => {
-  document.getElementById("sidebar").classList.toggle("open");
+  sidebar.classList.add("open");
 });
+
+closeSidebar.addEventListener("click", () => {
+  sidebar.classList.remove("open");
+});
+
+// Close sidebar after selecting a conversation
+const originalOpenConversation = openConversation;
+
+openConversation = function (id) {
+  originalOpenConversation(id);
+  sidebar.classList.remove("open");
+};
 
 // RESTORE LAST CONNECTED REPOSITORY
 window.addEventListener("DOMContentLoaded", () => {
@@ -467,3 +625,15 @@ window.addEventListener("DOMContentLoaded", () => {
     );
   }
 });
+
+// INITIALIZE CHAT HISTORY
+renderChatHistory();
+
+const savedRepository = localStorage.getItem("codeArcheologistRepositoryUrl");
+
+if (savedRepository) {
+  repositoryInput.value = savedRepository;
+  setRepositoryConnected(savedRepository);
+
+  showIndexStatus("Previously connected repository.");
+}
