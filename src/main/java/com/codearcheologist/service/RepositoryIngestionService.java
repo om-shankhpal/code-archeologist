@@ -1,15 +1,24 @@
+
 package com.codearcheologist.service;
 
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class RepositoryIngestionService {
 
+    private static final long CACHE_DURATION_MS =
+            30 * 60 * 1000L;
+
     private final GitHubRepositoryService repositoryService;
     private final GitHubContentService contentService;
+
+    private final Map<String, CachedRepository> cache =
+            new ConcurrentHashMap<>();
 
     public RepositoryIngestionService(
             GitHubRepositoryService repositoryService,
@@ -43,12 +52,37 @@ public class RepositoryIngestionService {
 
         String branch = repositoryService.getDefaultBranch(repositoryUrl);
 
-        List<GitHubContentService.RepositoryFile> downloadedFiles =
-                contentService.getRepositoryContents(owner, repository, branch);
+        String cacheKey = owner + "/" + repository + "/" + branch;
 
-        return downloadedFiles.stream()
-                .map(file -> new RepositoryFile(file.path(), file.content()))
+        CachedRepository cached = cache.get(cacheKey);
+
+        if (cached != null
+                && System.currentTimeMillis() - cached.cachedAt()
+                < CACHE_DURATION_MS) {
+            return cached.files();
+        }
+
+        List<RepositoryFile> files = contentService
+                .getRepositoryContents(owner, repository, branch)
+                .stream()
+                .map(file -> new RepositoryFile(
+                        file.path(),
+                        file.content()
+                ))
                 .toList();
+
+        cache.put(cacheKey, new CachedRepository(
+                files,
+                System.currentTimeMillis()
+        ));
+
+        return files;
+    }
+
+    private record CachedRepository(
+            List<RepositoryFile> files,
+            long cachedAt
+    ) {
     }
 
     public record RepositoryFile(String path, String content) {
