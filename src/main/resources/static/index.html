@@ -3,38 +3,158 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#1c2227" />
+    <meta name="theme-color" content="#000000" />
     <title>Code Archeologist</title>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <div class="app">
+    <div class="app" id="app">
       <!-- SIDEBAR -->
-      <aside class="sidebar" id="sidebar">
+      <aside class="sidebar" id="sidebar" aria-label="Sidebar">
+        <!-- Collapsed icon rail (desktop only) -->
+        <div class="sidebar-rail">
+          <button
+            class="rail-button"
+            id="railExpand"
+            title="Expand sidebar"
+            aria-label="Expand sidebar"
+          >
+            <svg
+              class="icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <path d="M9 3v18" />
+            </svg>
+          </button>
+          <button
+            class="rail-button"
+            id="railNewChat"
+            title="New chat"
+            aria-label="New chat"
+          >
+            <svg
+              class="icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </button>
+          <button
+            class="rail-button"
+            id="railHistory"
+            title="Chat history"
+            aria-label="Chat history"
+          >
+            <svg
+              class="icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 7v5l3 2" />
+            </svg>
+          </button>
+        </div>
+
         <div class="sidebar-top">
           <button
             class="sidebar-close"
             id="closeSidebar"
             aria-label="Close sidebar"
           >
-            ×
+            <svg
+              class="icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
           </button>
-          <a class="brand" href="/">
-            <span class="brand-icon">⌘</span>
-            <span class="brand-text">
-              Code Archeologist
-              <small>Dig through any codebase</small>
-            </span>
-          </a>
+
+          <div style="display: flex;">
+            <a class="brand" href="/">
+              <span class="brand-icon">
+                <svg
+                  class="icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="m16 18 6-6-6-6M8 6l-6 6 6 6" />
+                </svg>
+              </span>
+              <span class="brand-text">Code Archeologist</span>
+            </a>
+            <button
+              class="icon-button desktop-sidebar-toggle"
+              id="desktopSidebarToggle"
+              aria-label="Hide sidebar"
+              title="Hide sidebar"
+              aria-expanded="true"
+            >
+              <svg
+                class="icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <path d="M9 3v18" />
+              </svg>
+            </button>
+          </div>
 
           <button class="new-chat-button" id="newChatButton">
-            <span>＋</span> New chat
+            <svg
+              class="icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            <span>New chat</span>
           </button>
         </div>
 
         <!-- CHAT HISTORY -->
         <div class="sidebar-section chat-history-section">
-          <div class="sidebar-label">RECENT CHATS</div>
+          <div class="sidebar-label">Recent chats</div>
 
           <div id="chatHistory" class="chat-history">
             <div class="chat-history-empty">
@@ -43,82 +163,126 @@
           </div>
         </div>
 
-        <!-- REPOSITORY PANEL -->
-        <div class="repository-panel">
-          <div class="repository-panel-heading">
-            <strong>Repository</strong>
-            <span class="repo-dot" id="repoDot"></span>
-          </div>
-
-          <div class="repository-connected-name" id="repoSidebarStatus">
-            Not connected
-          </div>
-
-          <label for="repositoryUrl">GITHUB URL</label>
-
-          <input
-            type="url"
-            id="repositoryUrl"
-            placeholder="https://github.com/owner/repo"
-          />
-
-          <button class="connect-button" id="indexButton">
-            <span>Connect &amp; Index</span>
-            <span>→</span>
-          </button>
-          <button class="architecture-button" id="architectureButton">
-            <span>Analyze Architecture</span>
-            <span>⌘</span>
-          </button>
-
-          <div id="indexStatus" class="sidebar-status">
-            No repository indexed yet.
-          </div>
-
-          <div id="indexResult" class="index-result hidden"></div>
-        </div>
-
         <!-- PROFILE -->
         <div class="sidebar-bottom">
           <div class="profile-icon">CA</div>
-
-          <div>
+          <div class="profile-text">
             <strong>Code Archeologist</strong>
-            <span>Local AI Workspace</span>
+            <span>Local AI workspace</span>
           </div>
-
-          <span class="online-dot"></span>
         </div>
       </aside>
 
-      <!-- MAIN CHAT -->
+      <div
+        class="sidebar-backdrop"
+        id="sidebarBackdrop"
+        aria-hidden="true"
+      ></div>
+
+      <!-- MAIN WORKSPACE -->
       <main class="chat-area">
         <header class="chat-header">
           <div class="header-left">
-            <button class="mobile-menu" id="mobileMenu" aria-label="Open menu">
-              ☰
+            <button
+              class="icon-button mobile-menu"
+              id="mobileMenu"
+              aria-label="Open menu"
+            >
+              <svg
+                class="icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
             </button>
-            <span class="header-title">Code Archeologist</span>
-            <span class="model-badge">GEMINI AI</span>
+
+            <div class="header-titles">
+              <span class="header-title">Code Archeologist</span>
+              <span class="header-label">AI CODE ASSISTANT</span>
+            </div>
           </div>
 
           <div class="header-right">
-            <span class="header-status-dot"></span>
-            <span>LOCAL SESSION</span>
+            <span class="status-dot" aria-hidden="true"></span>
+            <span>Local session</span>
           </div>
         </header>
+
+        <!-- REPOSITORY CONNECTION -->
+        <section class="repo-bar" aria-label="Repository">
+          <div class="repo-inner">
+            <div class="repo-heading">
+              <span class="repo-dot" id="repoDot"></span>
+              <span class="repo-label">REPOSITORY</span>
+              <span class="repo-name" id="repoSidebarStatus"
+                >Not connected</span
+              >
+            </div>
+
+            <div class="repo-form">
+              <label for="repositoryUrl" class="sr-only"
+                >GitHub repository URL</label
+              >
+              <input
+                type="url"
+                id="repositoryUrl"
+                placeholder="https://github.com/owner/repo"
+              />
+
+              <button class="connect-button" id="indexButton">
+                <span>Connect &amp; Index</span>
+                <svg
+                  class="icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+
+            <div class="repo-status">
+              <span id="indexStatus" class="sidebar-status"
+                >No repository indexed yet.</span
+              >
+              <span id="indexResult" class="index-result hidden"></span>
+            </div>
+          </div>
+        </section>
 
         <!-- CHAT MESSAGES -->
         <section class="chat-content" id="chatContent">
           <div class="welcome-screen" id="welcomeScreen">
-            <div class="welcome-icon">⌘</div>
+            <div class="welcome-icon" aria-hidden="true">
+              <svg
+                class="icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="m16 18 6-6-6-6M8 6l-6 6 6 6" />
+              </svg>
+            </div>
 
-            <h1>Explore your codebase.</h1>
+            <h1>Understand any codebase.</h1>
 
             <p>
-              Your calm companion for understanding unfamiliar code. Ask
-              questions, trace execution flows, and make sense of any
-              repository.
+              Connect a GitHub repository and explore its architecture,
+              execution flow, and implementation details using AI.
             </p>
 
             <div class="suggestion-grid">
@@ -126,7 +290,6 @@
                 class="suggestion-card"
                 data-question="Explain the overall architecture of this repository."
               >
-                <span class="suggestion-icon">⌘</span>
                 <strong>Understand architecture</strong>
                 <span>Explore packages and responsibilities</span>
               </button>
@@ -135,7 +298,6 @@
                 class="suggestion-card"
                 data-question="Where is the main application class and what does it do?"
               >
-                <span class="suggestion-icon">⌖</span>
                 <strong>Find entry points</strong>
                 <span>Discover important classes and methods</span>
               </button>
@@ -144,7 +306,6 @@
                 class="suggestion-card"
                 data-question="Trace the complete request flow from controller to repository."
               >
-                <span class="suggestion-icon">↗</span>
                 <strong>Trace code execution</strong>
                 <span>Follow requests across multiple files</span>
               </button>
@@ -153,7 +314,6 @@
                 class="suggestion-card"
                 data-question="Identify potential bugs or suspicious code in this repository."
               >
-                <span class="suggestion-icon">⌕</span>
                 <strong>Analyze code quality</strong>
                 <span>Investigate possible issues</span>
               </button>
@@ -174,23 +334,132 @@
           </div>
         </section>
 
-        <!-- CHAT INPUT -->
+        <!-- ANALYSIS ACTIONS + CHAT INPUT -->
         <footer class="chat-footer">
-          <div class="composer">
-            <textarea
-              id="questionInput"
-              rows="1"
-              placeholder="Ask anything about your codebase..."
-            ></textarea>
-
-            <div class="composer-bottom">
-              <span class="composer-hint">
-                AI can make mistakes. Verify important code references.
-              </span>
-
-              <button id="askButton" class="send-button" title="Send message">
-                ↑
+          <div class="composer-wrap">
+            <div
+              class="analysis-toolbar"
+              role="toolbar"
+              aria-label="Analysis actions"
+            >
+              <button
+                class="analysis-button"
+                id="architectureButton"
+                type="button"
+              >
+                <svg
+                  class="icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="m12 3 9 5-9 5-9-5z" />
+                  <path d="m3 13 9 5 9-5" />
+                </svg>
+                <span>Analyze Architecture</span>
               </button>
+
+              <button
+                class="analysis-button"
+                type="button"
+                data-question="Trace the complete request flow from controller to repository."
+              >
+                <svg
+                  class="icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="5" cy="6" r="2" />
+                  <circle cx="19" cy="18" r="2" />
+                  <path d="M7 6h6a4 4 0 0 1 4 4v6" />
+                </svg>
+                <span>Code Flow Analysis</span>
+              </button>
+
+              <button
+                class="analysis-button"
+                type="button"
+                data-question="Where are the entry points of this repository? Name the main classes and methods."
+              >
+                <svg
+                  class="icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="m21 21-4.3-4.3" />
+                </svg>
+                <span>Find Entry Points</span>
+              </button>
+
+              <button
+                class="analysis-button"
+                type="button"
+                data-question="Identify potential bugs, code smells, or suspicious code in this repository."
+              >
+                <svg
+                  class="icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z" />
+                  <path d="m9 12 2 2 4-4" />
+                </svg>
+                <span>Code Quality Analysis</span>
+              </button>
+            </div>
+
+            <div class="composer">
+              <textarea
+                id="questionInput"
+                rows="1"
+                placeholder="Ask anything about your codebase..."
+              ></textarea>
+
+              <div class="composer-bottom">
+                <span class="composer-hint">
+                  AI can make mistakes. Verify important code references.
+                </span>
+
+                <button
+                  id="askButton"
+                  class="send-button"
+                  title="Send message"
+                  aria-label="Send message"
+                >
+                  <svg
+                    class="icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 19V5M5 12l7-7 7 7" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         </footer>

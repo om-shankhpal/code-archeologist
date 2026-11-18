@@ -17,40 +17,94 @@ const chatContent = document.getElementById("chatContent");
 const repoSidebarStatus = document.getElementById("repoSidebarStatus");
 const repoDot = document.getElementById("repoDot");
 
+const appShell = document.getElementById("app");
+const sidebar = document.getElementById("sidebar");
+const sidebarBackdrop = document.getElementById("sidebarBackdrop");
+const closeSidebar = document.getElementById("closeSidebar");
+const desktopSidebarToggle = document.getElementById("desktopSidebarToggle");
+
+const railExpand = document.getElementById("railExpand");
+const railNewChat = document.getElementById("railNewChat");
+const railHistory = document.getElementById("railHistory");
+
+// Original button markup, captured before any temporary label is set.
+const INDEX_BUTTON_LABEL = indexButton.innerHTML;
+const ASK_BUTTON_ICON = askButton.innerHTML;
+const ARCHITECTURE_BUTTON_LABEL = architectureButton.innerHTML;
+
 let isAsking = false;
 
 const chatHistory = document.getElementById("chatHistory");
 
-let conversations = JSON.parse(
-  localStorage.getItem("codeArcheologistChats") || "[]",
-);
-
+let conversations = [];
 let activeChatId = null;
-
-const CHAT_STORAGE_KEY = "codeArcheologistChats";
-
-function saveConversations() {
-  localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(conversations));
-}
 
 function getActiveConversation() {
   return conversations.find((chat) => chat.id === activeChatId);
 }
 
-function createConversation() {
-  const conversation = {
-    id: crypto.randomUUID(),
-    title: "New chat",
-    repositoryUrl: repositoryInput.value.trim(),
-    messages: [],
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  };
+async function loadConversations() {
+  try {
+    conversations = await fetchDbConversations();
+    renderChatHistory();
+  } catch (error) {
+    console.error("Failed to load conversations:", error);
+    chatHistory.replaceChildren();
+
+    const empty = document.createElement("div");
+    empty.className = "chat-history-empty";
+    empty.textContent = "Unable to load conversations.";
+    chatHistory.appendChild(empty);
+  }
+}
+
+async function migrateLocalConversations() {
+  const storageKey = "codeArcheologistChats";
+  const migrationKey = "codeArcheologistChatsMigrated";
+
+  if (localStorage.getItem(migrationKey) === "true") return;
+
+  const storedChats = JSON.parse(localStorage.getItem(storageKey) || "[]");
+
+  if (!Array.isArray(storedChats) || storedChats.length === 0) {
+    localStorage.setItem(migrationKey, "true");
+    return;
+  }
+
+  const migratedIds = JSON.parse(
+    localStorage.getItem("codeArcheologistMigratedIds") || "[]",
+  );
+
+  for (const oldChat of storedChats) {
+    if (migratedIds.includes(oldChat.id)) continue;
+
+    const created = await createDbConversation(oldChat.repositoryUrl || "");
+
+    for (const message of oldChat.messages || []) {
+      await saveDbMessage(created.id, message.role, message.content);
+    }
+
+    migratedIds.push(oldChat.id);
+
+    localStorage.setItem(
+      "codeArcheologistMigratedIds",
+      JSON.stringify(migratedIds),
+    );
+  }
+
+  localStorage.removeItem(storageKey);
+  localStorage.removeItem("codeArcheologistMigratedIds");
+  localStorage.setItem(migrationKey, "true");
+}
+
+async function createConversation() {
+  const conversation = await createDbConversation(repositoryInput.value.trim());
+
+  conversation.messages = [];
 
   conversations.unshift(conversation);
   activeChatId = conversation.id;
 
-  saveConversations();
   renderChatHistory();
 
   messages.replaceChildren();
@@ -59,25 +113,23 @@ function createConversation() {
   return conversation;
 }
 
-function saveMessage(role, content) {
+async function saveMessage(role, content) {
   const conversation = getActiveConversation();
 
   if (!conversation) return;
 
-  conversation.messages.push({
-    role,
-    content,
-    timestamp: Date.now(),
-  });
+  const savedMessage = await saveDbMessage(conversation.id, role, content);
+
+  conversation.messages = conversation.messages || [];
+  conversation.messages.push(savedMessage);
 
   if (role === "user" && conversation.title === "New chat") {
     conversation.title =
       content.length > 35 ? content.substring(0, 35) + "..." : content;
   }
 
-  conversation.updatedAt = Date.now();
+  conversation.updatedAt = savedMessage.createdAt;
 
-  saveConversations();
   renderChatHistory();
 }
 
@@ -106,14 +158,15 @@ function renderChatHistory() {
     deleteButton.className = "chat-history-delete";
     deleteButton.textContent = "×";
     deleteButton.title = "Delete conversation";
+    deleteButton.setAttribute("aria-label", "Delete conversation");
 
-    deleteButton.addEventListener("click", (event) => {
+    deleteButton.addEventListener("click", async (event) => {
       event.stopPropagation();
-      deleteConversation(conversation.id);
+      await deleteConversation(conversation.id);
     });
 
-    item.addEventListener("click", () => {
-      openConversation(conversation.id);
+    item.addEventListener("click", async () => {
+      await openConversation(conversation.id);
     });
 
     item.appendChild(title);
@@ -123,44 +176,60 @@ function renderChatHistory() {
   });
 }
 
-function openConversation(id) {
-  const conversation = conversations.find((chat) => chat.id === id);
+async function openConversation(id) {
+  try {
+    const conversation = await fetchDbConversation(id);
 
-  if (!conversation) return;
+    const existingIndex = conversations.findIndex((chat) => chat.id === id);
 
-  activeChatId = id;
+    if (existingIndex !== -1) {
+      conversations[existingIndex] = conversation;
+    }
 
-  messages.replaceChildren();
+    activeChatId = id;
 
-  welcomeScreen.classList.toggle("hidden", conversation.messages.length > 0);
+    messages.replaceChildren();
 
-  repositoryInput.value = conversation.repositoryUrl || "";
+    welcomeScreen.classList.toggle("hidden", conversation.messages.length > 0);
 
-  if (conversation.repositoryUrl) {
-    setRepositoryConnected(conversation.repositoryUrl);
+    repositoryInput.value = conversation.repositoryUrl || "";
+
+    if (conversation.repositoryUrl) {
+      setRepositoryConnected(conversation.repositoryUrl);
+    }
+
+    conversation.messages.forEach((message) => {
+      addMessage(message.role, message.content);
+    });
+
+    renderChatHistory();
+    scrollToBottom();
+    closeMobileSidebar();
+  } catch (error) {
+    console.error("Failed to open conversation:", error);
+    alert("Unable to open this conversation. Please try again.");
   }
-
-  conversation.messages.forEach((message) => {
-    addMessage(message.role, message.content);
-  });
-
-  renderChatHistory();
-  scrollToBottom();
 }
 
-function deleteConversation(id) {
-  conversations = conversations.filter(
-    (conversation) => conversation.id !== id,
-  );
+async function deleteConversation(id) {
+  try {
+    await deleteDbConversation(id);
 
-  if (activeChatId === id) {
-    activeChatId = null;
-    messages.replaceChildren();
-    welcomeScreen.classList.remove("hidden");
+    conversations = conversations.filter(
+      (conversation) => conversation.id !== id,
+    );
+
+    if (activeChatId === id) {
+      activeChatId = null;
+      messages.replaceChildren();
+      welcomeScreen.classList.remove("hidden");
+    }
+
+    renderChatHistory();
+  } catch (error) {
+    console.error("Failed to delete conversation:", error);
+    alert("Unable to delete this conversation. Please try again.");
   }
-
-  saveConversations();
-  renderChatHistory();
 }
 
 // API RESPONSE HANDLER
@@ -185,6 +254,55 @@ async function handleResponse(response) {
   }
 
   return data;
+}
+
+// DATABASE CHAT HISTORY API
+
+async function createDbConversation(repositoryUrl) {
+  const response = await fetch("/api/conversations", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ repositoryUrl }),
+  });
+
+  return handleResponse(response);
+}
+
+async function fetchDbConversations() {
+  const response = await fetch("/api/conversations");
+  return handleResponse(response);
+}
+
+async function fetchDbConversation(id) {
+  const response = await fetch(`/api/conversations/${id}`);
+  return handleResponse(response);
+}
+
+async function saveDbMessage(conversationId, role, content) {
+  const response = await fetch(
+    `/api/conversations/${conversationId}/messages`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ role, content }),
+    },
+  );
+
+  return handleResponse(response);
+}
+
+async function deleteDbConversation(id) {
+  const response = await fetch(`/api/conversations/${id}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    await handleResponse(response);
+  }
 }
 
 // STATUS DISPLAY
@@ -372,7 +490,7 @@ function addMessage(role, content) {
 
   const avatar = document.createElement("div");
   avatar.className = "message-avatar";
-  avatar.textContent = role === "user" ? "Y" : "⌘";
+  avatar.textContent = role === "user" ? "Y" : "CA";
 
   const name = document.createElement("span");
   name.textContent = role === "user" ? "You" : "Code Archeologist";
@@ -494,8 +612,7 @@ indexButton.addEventListener("click", async () => {
     showIndexStatus(error.message, "error");
   } finally {
     indexButton.disabled = false;
-
-    indexButton.innerHTML = "<span>Connect & Index</span><span>→</span>";
+    indexButton.innerHTML = INDEX_BUTTON_LABEL;
   }
 });
 
@@ -511,36 +628,37 @@ async function askQuestion(question) {
   ) {
     addMessage(
       "assistant",
-      "Please enter a valid GitHub repository URL in the sidebar first.",
+      "Please enter a valid GitHub repository URL in the repository section above first.",
     );
     return;
   }
 
   isAsking = true;
 
-  if (!activeChatId || !getActiveConversation()) {
-    createConversation();
-  }
-
-  const conversation = getActiveConversation();
-  conversation.repositoryUrl = repositoryUrl;
-
-  welcomeScreen.classList.add("hidden");
-
-  addMessage("user", question);
-  saveMessage("user", question);
-
-  questionInput.value = "";
-
   askButton.disabled = true;
   askButton.textContent = "…";
+
+  questionInput.value = "";
 
   const loadingMessage = addThinkingIndicator();
 
   setRepositoryConnected(repositoryUrl);
-  scrollToBottom();
 
   try {
+    if (!activeChatId || !getActiveConversation()) {
+      await createConversation();
+    }
+
+    const conversation = getActiveConversation();
+    conversation.repositoryUrl = repositoryUrl;
+
+    welcomeScreen.classList.add("hidden");
+
+    addMessage("user", question);
+    await saveMessage("user", question);
+
+    scrollToBottom();
+
     const response = await fetch("/api/repositories/ask", {
       method: "POST",
       headers: {
@@ -559,7 +677,7 @@ async function askQuestion(question) {
     const answer = data.answer || "No answer was returned.";
 
     addMessage("assistant", answer);
-    saveMessage("assistant", answer);
+    await saveMessage("assistant", answer);
 
     if (data.sources && data.sources.length > 0) {
       const sourcesContainer = document.createElement("div");
@@ -589,11 +707,16 @@ async function askQuestion(question) {
     const errorMessage = `Sorry, something went wrong: ${error.message}`;
 
     addMessage("assistant", errorMessage);
-    saveMessage("assistant", errorMessage);
+
+    try {
+      await saveMessage("assistant", errorMessage);
+    } catch (saveError) {
+      console.error("Failed to save error message:", saveError);
+    }
   } finally {
     isAsking = false;
     askButton.disabled = false;
-    askButton.textContent = "↑";
+    askButton.innerHTML = ASK_BUTTON_ICON;
 
     questionInput.focus();
     scrollToBottom();
@@ -613,40 +736,87 @@ questionInput.addEventListener("keydown", (event) => {
   }
 });
 
-// SUGGESTED QUESTIONS
+// SUGGESTED QUESTIONS (welcome screen)
 document.querySelectorAll(".suggestion-card").forEach((card) => {
   card.addEventListener("click", () => {
-    const question = card.dataset.question;
-    askQuestion(question);
+    askQuestion(card.dataset.question);
   });
 });
 
+// ANALYSIS ACTIONS (above composer). Architecture has its own handler below.
+document
+  .querySelectorAll(".analysis-button[data-question]")
+  .forEach((button) => {
+    button.addEventListener("click", () => {
+      askQuestion(button.dataset.question);
+    });
+  });
+
 // NEW CHAT
-newChatButton.addEventListener("click", () => {
-  createConversation();
-  questionInput.focus();
+newChatButton.addEventListener("click", async () => {
+  newChatButton.disabled = true;
+
+  try {
+    await createConversation();
+    questionInput.focus();
+  } catch (error) {
+    console.error("Failed to create conversation:", error);
+    alert("Unable to create a new conversation. Please try again.");
+  } finally {
+    newChatButton.disabled = false;
+  }
 });
 
-// MOBILE SIDEBAR
+// SIDEBAR: DESKTOP COLLAPSE / EXPAND
 
-const sidebar = document.getElementById("sidebar");
-const closeSidebar = document.getElementById("closeSidebar");
+function toggleDesktopSidebar() {
+  const isCollapsed = appShell.classList.toggle("sidebar-collapsed");
 
-mobileMenu.addEventListener("click", () => {
+  desktopSidebarToggle.setAttribute("aria-expanded", String(!isCollapsed));
+  desktopSidebarToggle.setAttribute(
+    "aria-label",
+    isCollapsed ? "Show sidebar" : "Hide sidebar",
+  );
+  desktopSidebarToggle.title = isCollapsed ? "Show sidebar" : "Hide sidebar";
+}
+
+function expandDesktopSidebar() {
+  if (appShell.classList.contains("sidebar-collapsed")) {
+    toggleDesktopSidebar();
+  }
+}
+
+desktopSidebarToggle.addEventListener("click", toggleDesktopSidebar);
+railExpand.addEventListener("click", toggleDesktopSidebar);
+
+railNewChat.addEventListener("click", () => {
+  newChatButton.click();
+});
+
+railHistory.addEventListener("click", () => {
+  expandDesktopSidebar();
+  chatHistory.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
+// SIDEBAR: MOBILE DRAWER
+
+function openMobileSidebar() {
   sidebar.classList.add("open");
-});
+}
 
-closeSidebar.addEventListener("click", () => {
+function closeMobileSidebar() {
   sidebar.classList.remove("open");
+}
+
+mobileMenu.addEventListener("click", openMobileSidebar);
+closeSidebar.addEventListener("click", closeMobileSidebar);
+sidebarBackdrop.addEventListener("click", closeMobileSidebar);
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeMobileSidebar();
+  }
 });
-
-// Close sidebar after selecting a conversation
-const originalOpenConversation = openConversation;
-
-openConversation = function (id) {
-  originalOpenConversation(id);
-  sidebar.classList.remove("open");
-};
 
 // RESTORE LAST CONNECTED REPOSITORY
 window.addEventListener("DOMContentLoaded", () => {
@@ -664,7 +834,17 @@ window.addEventListener("DOMContentLoaded", () => {
 });
 
 // INITIALIZE CHAT HISTORY
-renderChatHistory();
+async function initializeChatHistory() {
+  try {
+    await migrateLocalConversations();
+  } catch (error) {
+    console.error("Local conversation migration failed:", error);
+  }
+
+  await loadConversations();
+}
+
+initializeChatHistory();
 
 const savedRepository = localStorage.getItem("codeArcheologistRepositoryUrl");
 
@@ -685,16 +865,23 @@ architectureButton.addEventListener("click", async () => {
   }
 
   architectureButton.disabled = true;
-  architectureButton.innerHTML = "<span>Analyzing architecture...</span>";
-
-  welcomeScreen.classList.add("hidden");
-
-  addMessage("user", "Analyze the repository architecture.");
-  saveMessage("user", "Analyze the repository architecture.");
+  architectureButton.innerHTML = "<span>Analyzing...</span>";
 
   const loadingMessage = addThinkingIndicator();
 
   try {
+    if (!activeChatId || !getActiveConversation()) {
+      await createConversation();
+    }
+
+    const conversation = getActiveConversation();
+    conversation.repositoryUrl = repositoryUrl;
+
+    welcomeScreen.classList.add("hidden");
+
+    addMessage("user", "Analyze the repository architecture.");
+    await saveMessage("user", "Analyze the repository architecture.");
+
     const response = await fetch("/api/repositories/architecture", {
       method: "POST",
       headers: {
@@ -703,31 +890,29 @@ architectureButton.addEventListener("click", async () => {
       body: JSON.stringify({ repositoryUrl }),
     });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        data.message || data.error || "Architecture analysis failed.",
-      );
-    }
+    const data = await handleResponse(response);
 
     const answer = data.architecture || "No architecture overview returned.";
 
     loadingMessage.remove();
 
     addMessage("assistant", answer);
-    saveMessage("assistant", answer);
+    await saveMessage("assistant", answer);
   } catch (error) {
     loadingMessage.remove();
 
     const errorMessage = `Architecture analysis failed: ${error.message}`;
 
     addMessage("assistant", errorMessage);
-    saveMessage("assistant", errorMessage);
+
+    try {
+      await saveMessage("assistant", errorMessage);
+    } catch (saveError) {
+      console.error("Failed to save architecture error:", saveError);
+    }
   } finally {
     architectureButton.disabled = false;
-    architectureButton.innerHTML =
-      "<span>Analyze Architecture</span><span>⌘</span>";
+    architectureButton.innerHTML = ARCHITECTURE_BUTTON_LABEL;
 
     scrollToBottom();
   }
